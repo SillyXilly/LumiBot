@@ -15,17 +15,55 @@ class GameCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
+    def parse_players(self, players_str: str) -> tuple[list, dict]:
+        """
+        Parse player string to get list of players and pre-assigned lanes.
+        
+        Args:
+            players_str (str): Comma-separated list of players, optionally with pre-assigned lanes
+            
+        Returns:
+            tuple[list, dict]: List of players and dictionary of pre-assigned lanes
+        """
+        # Split players by comma and clean up whitespace
+        player_list = [p.strip() for p in players_str.split(',')]
+        
+        # Define all possible lanes
+        lanes = ['Top', 'Jungle', 'Mid', 'Bot', 'Support']
+        
+        # Initialize pre-assigned lanes dictionary
+        pre_assigned = {}
+        clean_players = []
+        
+        for player in player_list:
+            # Check if player has a pre-assigned lane
+            if '-' in player:
+                name, lane = [p.strip() for p in player.split('-')]
+                # Convert lane to proper format (first letter uppercase)
+                lane = lane.capitalize()
+                if lane in lanes:
+                    pre_assigned[name] = lane
+                    clean_players.append(name)
+                else:
+                    clean_players.append(player)
+            else:
+                clean_players.append(player)
+        
+        return clean_players, pre_assigned
+    
     @commands.command(name='team')
     async def team_command(self, ctx, *, players: str):
         """
         Randomly assign players to League of Legends lanes.
+        Players can have pre-assigned lanes using format: player-lane
+        Example: !team alice,bob-jungle,steve,jeremy
         
         Args:
             ctx (commands.Context): Command context
             players (str): Comma-separated list of players (2-5 players)
         """
-        # Split players by comma and clean up whitespace
-        player_list = [p.strip() for p in players.split(',')]
+        # Parse players and get pre-assigned lanes
+        player_list, pre_assigned = self.parse_players(players)
         
         # Validate number of players
         if len(player_list) < 2:
@@ -38,18 +76,29 @@ class GameCommands(commands.Cog):
         # Define all possible lanes
         lanes = ['Top', 'Jungle', 'Mid', 'Bot', 'Support']
         
-        # Randomly shuffle players
-        random.shuffle(player_list)
+        # Remove pre-assigned lanes from available lanes
+        available_lanes = [lane for lane in lanes if lane not in pre_assigned.values()]
+        
+        # Randomly shuffle remaining players
+        remaining_players = [p for p in player_list if p not in pre_assigned]
+        random.shuffle(remaining_players)
         
         # Create assignments
         assignments = []
-        for i, player in enumerate(player_list):
-            assignments.append(f"{lanes[i]}: {player}")
+        
+        # First add pre-assigned players
+        for player, lane in pre_assigned.items():
+            assignments.append(f"{lane}: {player}")
+        
+        # Then add remaining players to random lanes
+        for i, player in enumerate(remaining_players):
+            if i < len(available_lanes):
+                assignments.append(f"{available_lanes[i]}: {player}")
         
         # Create embed for better presentation
         embed = discord.Embed(
             title="League of Legends Team Assignment",
-            description="Here's your randomly assigned team composition!",
+            description="Here's your team composition!",
             color=discord.Color.blue()
         )
         
@@ -66,13 +115,15 @@ class GameCommands(commands.Cog):
     async def assign_command(self, ctx, *, players: str):
         """
         Randomly assign players to League of Legends lanes and suggest champions.
+        Players can have pre-assigned lanes using format: player-lane
+        Example: !assign alice,bob-jungle,steve,jeremy
         
         Args:
             ctx (commands.Context): Command context
             players (str): Comma-separated list of players (2-5 players)
         """
-        # Split players by comma and clean up whitespace
-        player_list = [p.strip() for p in players.split(',')]
+        # Parse players and get pre-assigned lanes
+        player_list, pre_assigned = self.parse_players(players)
         
         # Validate number of players
         if len(player_list) < 2:
@@ -85,8 +136,12 @@ class GameCommands(commands.Cog):
         # Define all possible lanes
         lanes = ['Top', 'Jungle', 'Mid', 'Bot', 'Support']
         
-        # Randomly shuffle players
-        random.shuffle(player_list)
+        # Remove pre-assigned lanes from available lanes
+        available_lanes = [lane for lane in lanes if lane not in pre_assigned.values()]
+        
+        # Randomly shuffle remaining players
+        remaining_players = [p for p in player_list if p not in pre_assigned]
+        random.shuffle(remaining_players)
         
         # Fetch champion data from Data Dragon API
         try:
@@ -101,8 +156,9 @@ class GameCommands(commands.Cog):
                     
                     # Create assignments with champion suggestions
                     assignments = []
-                    for i, player in enumerate(player_list):
-                        lane = lanes[i]
+                    
+                    # First add pre-assigned players
+                    for player, lane in pre_assigned.items():
                         # Get 3 random champions
                         suggested_champs = random.sample(champions, 3)
                         assignments.append({
@@ -111,10 +167,21 @@ class GameCommands(commands.Cog):
                             'champions': [champ['name'] for champ in suggested_champs]
                         })
                     
+                    # Then add remaining players to random lanes
+                    for i, player in enumerate(remaining_players):
+                        if i < len(available_lanes):
+                            # Get 3 random champions
+                            suggested_champs = random.sample(champions, 3)
+                            assignments.append({
+                                'lane': available_lanes[i],
+                                'player': player,
+                                'champions': [champ['name'] for champ in suggested_champs]
+                            })
+                    
                     # Create embed for better presentation
                     embed = discord.Embed(
                         title="League of Legends Team Assignment",
-                        description="Here's your randomly assigned team composition with champion suggestions!",
+                        description="Here's your team composition with champion suggestions!",
                         color=discord.Color.blue()
                     )
                     

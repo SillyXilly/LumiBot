@@ -20,7 +20,9 @@ A Discord music bot with advanced features including YouTube playback, playlist 
 
 ### Game Commands
 - `!team <players>` - Randomly assign players to League of Legends lanes (2-5 players)
+  - Supports pre-assigned lanes using format: `player-lane`
 - `!assign <players>` - Randomly assign players to League of Legends lanes and suggest champions (2-5 players)
+  - Supports pre-assigned lanes using format: `player-lane`
 
 ## Setup
 
