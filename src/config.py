@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Bot configuration
-COMMAND_PREFIX = '!'
+COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '!')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
 # YouTube downloader configuration
@@ -16,15 +16,14 @@ YTDL_FORMAT_OPTIONS = {
     'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
-    'noplaylist': False,
+    'noplaylist': True,
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'source_address': '0.0.0.0'
 }
 
 # FFmpeg configuration
@@ -35,4 +34,9 @@ FFMPEG_OPTIONS = {
 
 # Search configuration
 MAX_SEARCH_RESULTS = 5
-PLAYLIST_LIMIT = 30 
+PLAYLIST_LIMIT = 30
+
+# Data Dragon API configuration
+DATA_DRAGON_BASE_URL = "https://ddragon.leagueoflegends.com"
+DATA_DRAGON_VERSION = "15.6.1"  # Latest version as of now
+DATA_DRAGON_CHAMPION_URL = f"{DATA_DRAGON_BASE_URL}/cdn/{DATA_DRAGON_VERSION}/data/en_US/champion.json" 

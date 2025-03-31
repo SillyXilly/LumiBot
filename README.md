@@ -1,57 +1,69 @@
 # LumiBot
 
-A Discord bot with music playback capabilities and game-related features.
+A Discord music bot with advanced features including YouTube playback, playlist management, and game-related commands.
 
 ## Features
 
-### Music Features
-- Play music from YouTube URLs or search queries
-- Queue management system
-- Skip, pause, and resume playback
-- Timestamp skipping within songs
-- Volume control
-- Disconnect from voice channel
-
-### Game Features
-- League of Legends team assignment
-  - Randomly assign 2-5 players to different lanes
-  - Supports all standard lanes (Top, Jungle, Mid, Bot, Support)
-  - Clean embed presentation of assignments
-
-## Commands
-
 ### Music Commands
-- `!play <url or search query>` - Play music from a URL or search query
-- `!skip` - Skip the current song
+- `!play <song>` - Play a song from YouTube
 - `!pause` - Pause the current song
 - `!resume` - Resume the paused song
-- `!tskip <timestamp>` - Skip to a specific timestamp in the current song (format: mm:ss)
-- `!leave` - Disconnect from the voice channel
+- `!stop` - Stop playback and clear the queue
+- `!skip` - Skip the current song
+- `!tskip <timestamp>` - Skip to a specific timestamp in the current song (e.g., `!tskip 2:30`)
+- `!queue` - Display the current queue
+- `!clear` - Clear the queue
+- `!leave` - Disconnect the bot from the voice channel
+- `!np` - Show information about the currently playing song
+- `!volume <0-100>` - Adjust the playback volume
+- `!shuffle` - Shuffle the current queue
+- `!loop` - Toggle queue loop mode
+- `!search <query>` - Search for a song and choose from results
+- `!playlist <url>` - Play all songs from a YouTube playlist
 
 ### Game Commands
-- `!team <player1>,<player2>,...` - Randomly assign 2-5 players to League of Legends lanes
+- `!team <players>` - Randomly assign players to League of Legends lanes (2-5 players)
+- `!assign <players>` - Randomly assign players to League of Legends lanes and suggest champions (2-5 players)
 
 ## Setup
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Set up environment variables:
-   - `DISCORD_TOKEN`: Your Discord bot token
-   - `COMMAND_PREFIX`: Command prefix (default: '!')
+1. Clone the repository:
+```bash
+git clone https://github.com/SillyXilly/LumiBot.git
+cd LumiBot
+```
 
-4. Run the bot:
-   ```bash
-   python main.py
-   ```
+2. Create a virtual environment and activate it:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Create a `.env` file in the project root with your Discord bot token:
+```
+DISCORD_TOKEN=your_bot_token_here
+COMMAND_PREFIX=!
+```
+
+5. Run the bot:
+```bash
+python src/main.py
+```
 
 ## Requirements
-- Python 3.8+
-- discord.py
+- Python 3.8 or higher
+- FFmpeg installed on your system
+- Discord.py
 - yt-dlp
-- FFmpeg (for audio playback)
+- python-dotenv
+
+## Contributing
+Feel free to submit issues and enhancement requests!
 
 ## License
-MIT License 
+This project is licensed under the MIT License - see the LICENSE file for details. 
