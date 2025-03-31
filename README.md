@@ -8,18 +8,15 @@ A Discord music bot with advanced features including YouTube playback, playlist 
 - `!play <song>` - Play a song from YouTube
 - `!pause` - Pause the current song
 - `!resume` - Resume the paused song
-- `!stop` - Stop playback and clear the queue
 - `!skip` - Skip the current song
 - `!tskip <timestamp>` - Skip to a specific timestamp in the current song (e.g., `!tskip 2:30`)
-- `!queue` - Display the current queue
-- `!clear` - Clear the queue
+- `!qlist` - Display the current queue
+- `!qclear` - Clear the queue
 - `!leave` - Disconnect the bot from the voice channel
-- `!np` - Show information about the currently playing song
-- `!volume <0-100>` - Adjust the playback volume
 - `!shuffle` - Shuffle the current queue
-- `!loop` - Toggle queue loop mode
 - `!search <query>` - Search for a song and choose from results
 - `!playlist <url>` - Play all songs from a YouTube playlist
+- `!qskip <index>` - Skip to a specific song in the queue
 
 ### Game Commands
 - `!team <players>` - Randomly assign players to League of Legends lanes (2-5 players)
