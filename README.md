@@ -1,69 +1,57 @@
-# Discord Music Bot
+# LumiBot
 
-A simple Discord music bot to play music in voice channels from YouTube URLs, search terms, or playlists.
+A Discord bot with music playback capabilities and game-related features.
 
 ## Features
 
-- Play music from YouTube URLs
-- Search for songs by name
-- Play YouTube playlists
-- Queue management (add, list, skip, clear, shuffle)
-- Timestamp navigation
-- Voice channel control
+### Music Features
+- Play music from YouTube URLs or search queries
+- Queue management system
+- Skip, pause, and resume playback
+- Timestamp skipping within songs
+- Volume control
+- Disconnect from voice channel
 
-## Installation
-
-1. Clone this repository
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-3. Make sure you have [FFmpeg](https://ffmpeg.org/download.html) installed on your system
-4. Create a `.env` file with your Discord bot token and YouTube credentials:
-   ```
-   DISCORD_TOKEN=your_discord_bot_token_here
-   ```
-
-## Usage
-
-Run the bot:
-```
-python main.py
-```
+### Game Features
+- League of Legends team assignment
+  - Randomly assign 2-5 players to different lanes
+  - Supports all standard lanes (Top, Jungle, Mid, Bot, Support)
+  - Clean embed presentation of assignments
 
 ## Commands
 
-The bot uses `!` as the default command prefix.
-
-### Music Control
-- `!play <url or search term>` - Play a song from URL or search
-- `!search <search term>` - Show top 5 search results and choose
-- `!playlist <url>` - Add a YouTube playlist to the queue
+### Music Commands
+- `!play <url or search query>` - Play music from a URL or search query
 - `!skip` - Skip the current song
-- `!tskip <mm:ss>` - Skip to a specific timestamp in the song
 - `!pause` - Pause the current song
-- `!resume` - Resume playback
+- `!resume` - Resume the paused song
+- `!tskip <timestamp>` - Skip to a specific timestamp in the current song (format: mm:ss)
+- `!leave` - Disconnect from the voice channel
 
-### Queue Management
-- `!qlist` - Show the current queue
-- `!qskip <number>` - Skip to a specific song in the queue
-- `!qclear` - Clear the entire queue
-- `!shuffle` - Shuffle the remaining songs in the queue
+### Game Commands
+- `!team <player1>,<player2>,...` - Randomly assign 2-5 players to League of Legends lanes
 
-### Channel Control
-- `!leave` - Make the bot leave the voice channel
+## Setup
 
-**Important security notes:**
-- Don't share or commit your .env file
-- This setup is for personal use only
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Set up environment variables:
+   - `DISCORD_TOKEN`: Your Discord bot token
+   - `COMMAND_PREFIX`: Command prefix (default: '!')
+
+4. Run the bot:
+   ```bash
+   python main.py
+   ```
 
 ## Requirements
-
 - Python 3.8+
 - discord.py
 - yt-dlp
-- FFmpeg
+- FFmpeg (for audio playback)
 
 ## License
-
-MIT 
+MIT License 

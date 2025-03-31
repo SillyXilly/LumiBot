@@ -6,8 +6,9 @@ from discord.ext import commands
 
 from src.config import COMMAND_PREFIX, DISCORD_TOKEN
 from src.commands.music_commands import setup_music_commands
+from src.commands.game_commands import setup as setup_game_commands
 
-def create_bot() -> commands.Bot:
+async def create_bot() -> commands.Bot:
     """
     Create and configure the Discord bot.
     
@@ -40,12 +41,14 @@ def create_bot() -> commands.Bot:
     
     # Register commands
     setup_music_commands(bot)
+    await setup_game_commands(bot)
     
     return bot
 
 def run_bot() -> None:
     """Run the Discord bot"""
-    bot = create_bot()
+    import asyncio
+    bot = asyncio.run(create_bot())
     
     if not DISCORD_TOKEN:
         raise ValueError("No Discord token found in environment variables. "
