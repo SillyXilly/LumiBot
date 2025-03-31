@@ -49,7 +49,7 @@ COMMAND_PREFIX=!
 
 5. Run the bot:
 ```bash
-python src/main.py
+python main.py
 ```
 
 ## Requirements
