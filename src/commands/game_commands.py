@@ -159,8 +159,20 @@ class GameCommands(commands.Cog):
                     
                     # First add pre-assigned players
                     for player, lane in pre_assigned.items():
-                        # Get 3 random champions
-                        suggested_champs = random.sample(champions, 3)
+                        # Filter champions based on lane
+                        if lane == 'Top':
+                            lane_champs = [c for c in champions if 'Fighter' in c['tags'] or 'Tank' in c['tags']]
+                        elif lane == 'Jungle':
+                            lane_champs = [c for c in champions if 'Fighter' in c['tags'] or 'Tank' in c['tags'] or 'Assassin' in c['tags']]
+                        elif lane == 'Mid':
+                            lane_champs = [c for c in champions if 'Mage' in c['tags'] or 'Assassin' in c['tags']]
+                        elif lane == 'Bot':
+                            lane_champs = [c for c in champions if 'Marksman' in c['tags']]
+                        else:  # Support
+                            lane_champs = [c for c in champions if 'Support' in c['tags'] or 'Tank' in c['tags'] or 'Mage' in c['tags']]
+                        
+                        # Get 3 random champions for the lane
+                        suggested_champs = random.sample(lane_champs, min(3, len(lane_champs)))
                         assignments.append({
                             'lane': lane,
                             'player': player,
@@ -170,10 +182,23 @@ class GameCommands(commands.Cog):
                     # Then add remaining players to random lanes
                     for i, player in enumerate(remaining_players):
                         if i < len(available_lanes):
-                            # Get 3 random champions
-                            suggested_champs = random.sample(champions, 3)
+                            lane = available_lanes[i]
+                            # Filter champions based on lane
+                            if lane == 'Top':
+                                lane_champs = [c for c in champions if 'Fighter' in c['tags'] or 'Tank' in c['tags']]
+                            elif lane == 'Jungle':
+                                lane_champs = [c for c in champions if 'Fighter' in c['tags'] or 'Tank' in c['tags'] or 'Assassin' in c['tags']]
+                            elif lane == 'Mid':
+                                lane_champs = [c for c in champions if 'Mage' in c['tags'] or 'Assassin' in c['tags']]
+                            elif lane == 'Bot':
+                                lane_champs = [c for c in champions if 'Marksman' in c['tags']]
+                            else:  # Support
+                                lane_champs = [c for c in champions if 'Support' in c['tags'] or 'Tank' in c['tags'] or 'Mage' in c['tags']]
+                            
+                            # Get 3 random champions for the lane
+                            suggested_champs = random.sample(lane_champs, min(3, len(lane_champs)))
                             assignments.append({
-                                'lane': available_lanes[i],
+                                'lane': lane,
                                 'player': player,
                                 'champions': [champ['name'] for champ in suggested_champs]
                             })
