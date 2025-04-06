@@ -22,13 +22,10 @@ class MusicPlayer:
         """
         self.bot = bot
         self._current_ctx: Optional[commands.Context] = None
-    
-    @property
-    def is_playing(self) -> bool:
-        """Check if the bot is currently playing music"""
-        if not self._current_ctx or not self._current_ctx.voice_client:
-            return False
-        return self._current_ctx.voice_client.is_playing()
+        self.is_playing = False
+        self.current = None
+        self.voice_client = None
+        self.disconnect_timer = None
     
     @property
     def is_paused(self) -> bool:
@@ -59,6 +56,7 @@ class MusicPlayer:
                 voice_client = await voice_channel.connect()
                 await ctx.send(f"Joined {voice_channel}")
                 self._current_ctx = ctx
+                self.voice_client = voice_client
                 return voice_client
             except Exception as e:
                 await ctx.send(f"Failed to join {voice_channel}: {e}")
@@ -67,9 +65,11 @@ class MusicPlayer:
             await voice_client.move_to(voice_channel)
             await ctx.send(f"Moved to {voice_channel}")
             self._current_ctx = ctx
+            self.voice_client = voice_client
             return voice_client
         else:
             self._current_ctx = ctx
+            self.voice_client = voice_client
             return voice_client
     
     async def play_from_url_or_search(self, ctx: commands.Context, query: str) -> None:
@@ -162,38 +162,66 @@ class MusicPlayer:
         Args:
             ctx (commands.Context): Command context
         """
-        if not ctx.voice_client:
+        if self.disconnect_timer:
+            self.disconnect_timer.cancel()
+            self.disconnect_timer = None
+            
+        if queue_manager.is_empty:
+            self.is_playing = False
+            self.current = None
+            
+            # Start disconnect timer
+            self.disconnect_timer = asyncio.create_task(self._disconnect_after_delay(ctx))
             return
             
-        next_item = await queue_manager.get_next()
-        if next_item:
-            try:
-                # Check if next_item includes a timestamp (tuple of 3 elements)
-                if len(next_item) == 3:
-                    title, url, timestamp = next_item
-                    player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True, timestamp=timestamp)
-                else:
-                    title, url = next_item
-                    player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-                
-                # Define callback for when song ends
-                def after_play(error):
-                    if error:
-                        asyncio.run_coroutine_threadsafe(
-                            ctx.send(f'An error occurred: {error}'),
-                            self.bot.loop
-                        )
-                    asyncio.run_coroutine_threadsafe(self._play_next(ctx), self.bot.loop)
-                
-                ctx.voice_client.play(player, after=after_play)
-                await ctx.send(f'Now playing: {player.title}')
-                
-            except Exception as e:
-                await ctx.send(f'An error occurred while playing ({title}): {str(e)}')
-                await self._play_next(ctx)
-        else:
-            await ctx.send("Queue is empty. Disconnecting...")
-            await ctx.voice_client.disconnect()
+        self.is_playing = True
+        self.current = queue_manager.next()
+        
+        try:
+            # Check if next_item includes a timestamp (tuple of 3 elements)
+            if len(self.current) == 3:
+                title, url, timestamp = self.current
+                player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True, timestamp=timestamp)
+            else:
+                title, url = self.current
+                player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+            
+            # Define callback for when song ends
+            def after_play(error):
+                if error:
+                    asyncio.run_coroutine_threadsafe(
+                        ctx.send(f'An error occurred: {error}'),
+                        self.bot.loop
+                    )
+                asyncio.run_coroutine_threadsafe(self._play_next(ctx), self.bot.loop)
+            
+            self.voice_client.play(player, after=after_play)
+            await ctx.send(f'Now playing: {player.title}')
+            
+        except Exception as e:
+            await ctx.send(f'An error occurred while playing ({title}): {str(e)}')
+            await self._play_next(ctx)
+    
+    async def _disconnect_after_delay(self, ctx: commands.Context) -> None:
+        """
+        Disconnect from voice channel after 2 minutes if no new songs are added.
+        
+        Args:
+            ctx (commands.Context): Command context
+        """
+        try:
+            await asyncio.sleep(120)  # Wait for 2 minutes
+            
+            # Check if queue is still empty and we're not playing anything
+            if queue_manager.is_empty and not self.is_playing:
+                if self.voice_client and self.voice_client.is_connected():
+                    await self.voice_client.disconnect()
+                    self.voice_client = None
+                    await ctx.send("Disconnected due to inactivity.")
+                    
+        except asyncio.CancelledError:
+            # Timer was cancelled, do nothing
+            pass
     
     async def pause(self, ctx: commands.Context) -> None:
         """
@@ -202,8 +230,8 @@ class MusicPlayer:
         Args:
             ctx (commands.Context): Command context
         """
-        if ctx.voice_client and ctx.voice_client.is_playing():
-            ctx.voice_client.pause()
+        if self.voice_client and self.voice_client.is_playing():
+            self.voice_client.pause()
             await ctx.send("The song has been paused.")
         else:
             await ctx.send("The bot is not playing anything at the moment.")
@@ -215,8 +243,8 @@ class MusicPlayer:
         Args:
             ctx (commands.Context): Command context
         """
-        if ctx.voice_client and ctx.voice_client.is_paused():
-            ctx.voice_client.resume()
+        if self.voice_client and self.voice_client.is_paused():
+            self.voice_client.resume()
             await ctx.send("The song has been resumed.")
         else:
             await ctx.send("The bot was not playing anything before this. Use play command.")
@@ -228,8 +256,8 @@ class MusicPlayer:
         Args:
             ctx (commands.Context): Command context
         """
-        if ctx.voice_client and ctx.voice_client.is_playing():
-            ctx.voice_client.stop()
+        if self.voice_client and self.voice_client.is_playing():
+            self.voice_client.stop()
             await ctx.send("Skipped the current song.")
         else:
             await ctx.send("The bot is not playing anything at the moment.")
@@ -242,7 +270,7 @@ class MusicPlayer:
             ctx (commands.Context): Command context
             timestamp (str): Timestamp in mm:ss format
         """
-        if not ctx.voice_client or not ctx.voice_client.is_playing():
+        if not self.voice_client or not self.voice_client.is_playing():
             await ctx.send("The bot is not playing anything at the moment.")
             return
             
@@ -256,7 +284,7 @@ class MusicPlayer:
             total_seconds = minutes * 60 + seconds
             
             # Get current song
-            current_song = queue_manager.current
+            current_song = self.current
             if not current_song:
                 await ctx.send("No current song found in queue.")
                 return
@@ -269,7 +297,7 @@ class MusicPlayer:
             
             # Now skip the current song - this will trigger the normal after_play callback
             # which will play the next song in the queue (our timestamped version)
-            ctx.voice_client.stop()
+            self.voice_client.stop()
             await ctx.send(f"Skipping to {timestamp} in {title}...")
             
         except ValueError:
