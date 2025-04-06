@@ -175,7 +175,7 @@ class MusicPlayer:
             return
             
         self.is_playing = True
-        self.current = queue_manager.next()
+        self.current = await queue_manager.get_next()
         
         try:
             # Check if next_item includes a timestamp (tuple of 3 elements)
