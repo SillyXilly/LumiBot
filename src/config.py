@@ -11,9 +11,9 @@ load_dotenv()
 COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '!')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
-# YouTube downloader configuration
+# YouTube downloader configuration - optimized for better format selection
 YTDL_FORMAT_OPTIONS = {
-    'format': 'bestaudio/best',
+    'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
     'noplaylist': True,
@@ -23,12 +23,15 @@ YTDL_FORMAT_OPTIONS = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0'
+    'source_address': '0.0.0.0',
+    'extractaudio': True,
+    'audioformat': 'm4a',
+    'prefer_ffmpeg': True
 }
 
-# FFmpeg configuration
+# FFmpeg configuration - optimized for better streaming performance
 FFMPEG_OPTIONS = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin',
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -probesize 200M -analyzeduration 0 -nostdin',
     'options': '-vn -bufsize 512k'
 }
 

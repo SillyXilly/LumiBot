@@ -43,9 +43,17 @@ class YTDLSource(discord.PCMVolumeTransformer):
         
         for attempt in range(retries):
             try:
-                # Extract info from YouTube
+                # Extract info from YouTube with better error handling
                 def extract_data():
-                    return cls.ytdl.extract_info(url, download=not stream)
+                    try:
+                        return cls.ytdl.extract_info(url, download=not stream)
+                    except Exception as e:
+                        if "Sign in to confirm your age" in str(e) or "Private video" in str(e):
+                            raise Exception(f"Video unavailable: {e}")
+                        elif "Video unavailable" in str(e):
+                            raise Exception(f"Video not found or deleted: {e}")
+                        else:
+                            raise e
                 data = await loop.run_in_executor(None, extract_data)
                 
                 if 'entries' in data:
@@ -67,13 +75,30 @@ class YTDLSource(discord.PCMVolumeTransformer):
                         current_options = custom_ffmpeg_options.get('options', '')
                         custom_ffmpeg_options['options'] = f"{current_options} -ss {timestamp}".strip()
                 
-                # Create FFmpeg audio source
-                return cls(discord.FFmpegPCMAudio(filename, **custom_ffmpeg_options), data=data)
+                # Create FFmpeg audio source with better performance using Opus
+                try:
+                    # Try FFmpegOpusAudio first for better performance
+                    audio_source = await discord.FFmpegOpusAudio.from_probe(filename, **custom_ffmpeg_options)
+                    return cls(audio_source, data=data)
+                except Exception as opus_error:
+                    # Fallback to FFmpegPCMAudio if Opus fails
+                    print(f"FFmpegOpusAudio failed, falling back to FFmpegPCMAudio: {opus_error}")
+                    return cls(discord.FFmpegPCMAudio(filename, **custom_ffmpeg_options), data=data)
                 
             except Exception as e:
                 if attempt == retries - 1:
-                    raise e
-                await asyncio.sleep(1)
+                    # Provide more helpful error messages
+                    error_msg = str(e)
+                    if "Video unavailable" in error_msg or "Private video" in error_msg:
+                        raise Exception(f"Cannot play this video - it may be private, age-restricted, or deleted: {error_msg}")
+                    elif "Sign in to confirm" in error_msg:
+                        raise Exception("Cannot play age-restricted videos")
+                    elif "FFmpeg" in error_msg or "ffmpeg" in error_msg:
+                        raise Exception(f"Audio processing error - please check if FFmpeg is properly installed: {error_msg}")
+                    else:
+                        raise Exception(f"Failed to load audio after {retries} attempts: {error_msg}")
+                # Exponential backoff for retries
+                await asyncio.sleep(2 ** attempt)
 
     @classmethod
     async def search_source(cls, search_query, *, loop=None, max_results=5):
