@@ -209,7 +209,7 @@ class MusicPlayer:
                 return
             
             # Define callback for when song ends
-            def after_play(error, **kwargs):
+            def after_play(error):
                 if error:
                     # Log the error for debugging but don't spam the chat
                     print(f"Playback error: {error}")
