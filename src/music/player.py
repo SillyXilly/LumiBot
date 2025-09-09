@@ -34,12 +34,13 @@ class MusicPlayer:
             return False
         return self._current_ctx.voice_client.is_paused()
     
-    async def connect_to_voice(self, ctx: commands.Context) -> Optional[discord.VoiceClient]:
+    async def connect_to_voice(self, ctx: commands.Context, retries: int = 3) -> Optional[discord.VoiceClient]:
         """
-        Connect to the user's voice channel.
+        Connect to the user's voice channel with retry logic.
         
         Args:
             ctx (commands.Context): Command context
+            retries (int): Number of connection attempts
             
         Returns:
             Optional[discord.VoiceClient]: Voice client if successfully connected, None otherwise
@@ -51,26 +52,37 @@ class MusicPlayer:
         voice_channel = ctx.author.voice.channel
         voice_client = ctx.voice_client
         
-        if voice_client is None:
+        # If already connected to the same channel, return existing client
+        if voice_client and voice_client.channel == voice_channel and voice_client.is_connected():
+            self._current_ctx = ctx
+            self.voice_client = voice_client
+            return voice_client
+        
+        # If connected to different channel, disconnect first
+        if voice_client and voice_client.is_connected():
             try:
-                voice_client = await voice_channel.connect()
+                await voice_client.disconnect(force=True)
+                await asyncio.sleep(1)  # Wait a moment before reconnecting
+            except Exception:
+                pass  # Ignore errors when disconnecting
+        
+        # Attempt to connect with retries
+        for attempt in range(retries):
+            try:
+                voice_client = await voice_channel.connect(timeout=10.0, reconnect=True)
                 await ctx.send(f"Joined {voice_channel}")
                 self._current_ctx = ctx
                 self.voice_client = voice_client
                 return voice_client
             except Exception as e:
-                await ctx.send(f"Failed to join {voice_channel}: {e}")
-                return None
-        elif voice_client.channel != voice_channel:
-            await voice_client.move_to(voice_channel)
-            await ctx.send(f"Moved to {voice_channel}")
-            self._current_ctx = ctx
-            self.voice_client = voice_client
-            return voice_client
-        else:
-            self._current_ctx = ctx
-            self.voice_client = voice_client
-            return voice_client
+                if attempt < retries - 1:
+                    await ctx.send(f"Connection attempt {attempt + 1} failed, retrying... ({e})")
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    await ctx.send(f"Failed to join {voice_channel} after {retries} attempts: {e}")
+                    return None
+        
+        return None
     
     async def play_from_url_or_search(self, ctx: commands.Context, query: str) -> None:
         """
@@ -104,7 +116,9 @@ class MusicPlayer:
         """
         try:
             # Extract info to get the title
-            info = await self.bot.loop.run_in_executor(None, lambda: YTDLSource.ytdl.extract_info(url, download=False))
+            def extract_info():
+                return YTDLSource.ytdl.extract_info(url, download=False)
+            info = await self.bot.loop.run_in_executor(None, extract_info)
             
             if 'entries' in info:
                 # It's a playlist or single video in a playlist format
@@ -135,7 +149,9 @@ class MusicPlayer:
         try:
             # Format query for YouTube search
             search_query = f"ytsearch1:{query}"
-            info = await self.bot.loop.run_in_executor(None, lambda: YTDLSource.ytdl.extract_info(search_query, download=False))
+            def extract_search_info():
+                return YTDLSource.ytdl.extract_info(search_query, download=False)
+            info = await self.bot.loop.run_in_executor(None, extract_search_info)
             
             if 'entries' in info and info['entries']:
                 entry = info['entries'][0]
@@ -186,13 +202,23 @@ class MusicPlayer:
                 title, url = self.current
                 player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
             
+            # Check if voice client is still connected
+            if not self.voice_client or not self.voice_client.is_connected():
+                await ctx.send("Voice connection lost. Please try rejoining the voice channel.")
+                self.is_playing = False
+                return
+            
             # Define callback for when song ends
-            def after_play(error):
+            def after_play(error, **kwargs):
                 if error:
-                    asyncio.run_coroutine_threadsafe(
-                        ctx.send(f'An error occurred: {error}'),
-                        self.bot.loop
-                    )
+                    # Log the error for debugging but don't spam the chat
+                    print(f"Playback error: {error}")
+                    # Only send message for non-connection errors
+                    if "Connection" not in str(error) and "WebSocket" not in str(error):
+                        asyncio.run_coroutine_threadsafe(
+                            ctx.send(f'An error occurred: {error}'),
+                            self.bot.loop
+                        )
                 asyncio.run_coroutine_threadsafe(self._play_next(ctx), self.bot.loop)
             
             self.voice_client.play(player, after=after_play)
@@ -215,9 +241,14 @@ class MusicPlayer:
             # Check if queue is still empty and we're not playing anything
             if queue_manager.is_empty and not self.is_playing:
                 if self.voice_client and self.voice_client.is_connected():
-                    await self.voice_client.disconnect()
-                    self.voice_client = None
-                    await ctx.send("Disconnected due to inactivity.")
+                    try:
+                        await self.voice_client.disconnect(force=True)
+                        self.voice_client = None
+                        await ctx.send("Disconnected due to inactivity.")
+                    except Exception as e:
+                        # If disconnect fails, just clean up our references
+                        self.voice_client = None
+                        print(f"Error during auto-disconnect: {e}")
                     
         except asyncio.CancelledError:
             # Timer was cancelled, do nothing
@@ -312,10 +343,20 @@ class MusicPlayer:
         """
         voice_client = ctx.voice_client
         if voice_client:
-            voice_client.stop()
-            await voice_client.disconnect()
-            queue_manager.clear()
-            await ctx.send("The bot has left the voice channel.")
+            try:
+                if voice_client.is_playing():
+                    voice_client.stop()
+                await voice_client.disconnect(force=True)
+                queue_manager.clear()
+                self.is_playing = False
+                self.current = None
+                self.voice_client = None
+                if self.disconnect_timer:
+                    self.disconnect_timer.cancel()
+                    self.disconnect_timer = None
+                await ctx.send("The bot has left the voice channel.")
+            except Exception as e:
+                await ctx.send(f"Error while leaving voice channel: {e}")
         else:
             await ctx.send("The bot is not connected to a voice channel.")
 

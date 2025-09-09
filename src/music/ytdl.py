@@ -44,7 +44,9 @@ class YTDLSource(discord.PCMVolumeTransformer):
         for attempt in range(retries):
             try:
                 # Extract info from YouTube
-                data = await loop.run_in_executor(None, lambda: cls.ytdl.extract_info(url, download=not stream))
+                def extract_data():
+                    return cls.ytdl.extract_info(url, download=not stream)
+                data = await loop.run_in_executor(None, extract_data)
                 
                 if 'entries' in data:
                     # Take first item from a playlist
@@ -58,10 +60,12 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 if timestamp > 0:
                     if stream:
                         # For streaming, timestamp needs to be in before_options
-                        custom_ffmpeg_options['before_options'] = f"{custom_ffmpeg_options.get('before_options', '')} -ss {timestamp}"
+                        current_before = custom_ffmpeg_options.get('before_options', '')
+                        custom_ffmpeg_options['before_options'] = f"{current_before} -ss {timestamp}".strip()
                     else:
                         # For downloaded files, timestamp can be in options
-                        custom_ffmpeg_options['options'] = f"{custom_ffmpeg_options.get('options', '')} -ss {timestamp}"
+                        current_options = custom_ffmpeg_options.get('options', '')
+                        custom_ffmpeg_options['options'] = f"{current_options} -ss {timestamp}".strip()
                 
                 # Create FFmpeg audio source
                 return cls(discord.FFmpegPCMAudio(filename, **custom_ffmpeg_options), data=data)
@@ -90,7 +94,9 @@ class YTDLSource(discord.PCMVolumeTransformer):
         search_query = f"ytsearch{max_results}:{search_query}"
         
         try:
-            info = await loop.run_in_executor(None, lambda: cls.ytdl.extract_info(search_query, download=False))
+            def extract_search_data():
+                return cls.ytdl.extract_info(search_query, download=False)
+            info = await loop.run_in_executor(None, extract_search_data)
             
             if info and 'entries' in info and info['entries']:
                 entries = info['entries']

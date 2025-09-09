@@ -115,9 +115,9 @@ def setup_music_commands(bot: commands.Bot) -> None:
                 # Create a temporary ytdl instance with these options
                 temp_ytdl = youtube_dl.YoutubeDL(ytdl_options)
                 
-                playlist_dict = await bot.loop.run_in_executor(
-                    None, lambda: temp_ytdl.extract_info(url, download=False)
-                )
+                def extract_playlist_info():
+                    return temp_ytdl.extract_info(url, download=False)
+                playlist_dict = await bot.loop.run_in_executor(None, extract_playlist_info)
                 
                 if 'entries' not in playlist_dict:
                     await ctx.send('This URL does not appear to be a playlist.')
@@ -264,4 +264,26 @@ def setup_music_commands(bot: commands.Bot) -> None:
     @bot.command(name='leave', help='Make the bot leave the voice channel')
     async def leave_command(ctx):
         """Make the bot leave the voice channel"""
-        await player.leave(ctx) 
+        await player.leave(ctx)
+    
+    @bot.command(name='reconnect', help='Reconnect to voice channel if connection is lost')
+    async def reconnect_command(ctx):
+        """Reconnect to voice channel"""
+        if not ctx.author.voice:
+            await ctx.send(f"{ctx.author.name} is not connected to a voice channel")
+            return
+        
+        # Force disconnect first
+        if ctx.voice_client:
+            try:
+                await ctx.voice_client.disconnect(force=True)
+                await asyncio.sleep(1)
+            except Exception:
+                pass
+        
+        # Reconnect
+        voice_client = await player.connect_to_voice(ctx)
+        if voice_client:
+            await ctx.send("Successfully reconnected to voice channel!")
+        else:
+            await ctx.send("Failed to reconnect to voice channel.") 
