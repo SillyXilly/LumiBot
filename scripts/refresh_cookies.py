@@ -16,6 +16,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -50,12 +51,27 @@ class YouTubeCookieRefresher:
         chrome_options.add_experimental_option("prefs", prefs)
         
         try:
-            self.driver = webdriver.Chrome(options=chrome_options)
+            print("🔍 Setting up Chrome driver...")
+            # Use ChromeDriverManager to automatically download and manage ChromeDriver
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.implicitly_wait(10)
             print("✅ Chrome driver initialized successfully")
         except Exception as e:
             print(f"❌ Failed to initialize Chrome driver: {e}")
-            raise
+            print("💡 Trying alternative ChromeDriver setup...")
+            
+            # Fallback: try without service (if ChromeDriver is in PATH)
+            try:
+                self.driver = webdriver.Chrome(options=chrome_options)
+                self.driver.implicitly_wait(10)
+                print("✅ Chrome driver initialized successfully (fallback method)")
+            except Exception as fallback_error:
+                print(f"❌ Fallback also failed: {fallback_error}")
+                print("🔧 Please ensure Chrome and ChromeDriver are properly installed:")
+                print("   1. Install Chrome: sudo apt install google-chrome-stable")
+                print("   2. Run setup script: ./scripts/setup_automation.sh")
+                raise
     
     def login_to_youtube(self):
         """Automated login to YouTube"""
