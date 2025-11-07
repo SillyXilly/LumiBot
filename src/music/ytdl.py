@@ -7,8 +7,8 @@ import yt_dlp as youtube_dl
 from src.config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS
 
 # Suppress bug reports from yt-dlp
-def suppress_bug_reports():
-    """Suppress yt-dlp bug report messages"""
+def suppress_bug_reports(*args, **kwargs):
+    """Suppress yt-dlp bug report messages - accepts any arguments"""
     return ''
 
 youtube_dl.utils.bug_reports_message = suppress_bug_reports
