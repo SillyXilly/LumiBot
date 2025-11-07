@@ -30,3 +30,9 @@ var/
 # Bot temporary files
 *-*.webm
 *-*.mp3 
+
+# VSCode
+.vscode/
+
+# Claude
+.claude/
