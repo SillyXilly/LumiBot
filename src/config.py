@@ -26,7 +26,11 @@ YTDL_FORMAT_OPTIONS = {
     'source_address': '0.0.0.0',
     'extractaudio': True,
     'audioformat': 'm4a',
-    'prefer_ffmpeg': True
+    'prefer_ffmpeg': True,
+    # Cookie configuration for YouTube authentication
+    #'cookiesfrombrowser': ('chrome',),  # Extract cookies from Chrome browser
+    # Alternative: use 
+    'cookiefile': 'cookies.txt'
 }
 
 # FFmpeg configuration - optimized for better streaming performance

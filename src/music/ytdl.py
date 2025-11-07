@@ -111,8 +111,10 @@ class YTDLSource(discord.PCMVolumeTransformer):
                     error_msg = str(e)
                     if "Video unavailable" in error_msg or "Private video" in error_msg:
                         raise Exception(f"Cannot play this video - it may be private, age-restricted, or deleted: {error_msg}")
-                    elif "Sign in to confirm" in error_msg:
-                        raise Exception("Cannot play age-restricted videos")
+                    elif "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+                        raise Exception("YouTube authentication required. The bot is configured to use browser cookies. Make sure you're logged into YouTube in Chrome, then restart the bot. See YOUTUBE_SETUP.md for details.")
+                    elif "cookies" in error_msg.lower():
+                        raise Exception("Cookie authentication failed. Please check that you're logged into YouTube in your browser. See YOUTUBE_SETUP.md for setup instructions.")
                     elif "FFmpeg" in error_msg or "ffmpeg" in error_msg:
                         raise Exception(f"Audio processing error - please check if FFmpeg is properly installed: {error_msg}")
                     else:
