@@ -6,8 +6,12 @@ import discord
 import yt_dlp as youtube_dl
 from src.config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS
 
-# Suppress bug reports from youtube_dl
-youtube_dl.utils.bug_reports_message = lambda: ''
+# Suppress bug reports from yt-dlp
+def suppress_bug_reports():
+    """Suppress yt-dlp bug report messages"""
+    return ''
+
+youtube_dl.utils.bug_reports_message = suppress_bug_reports
 
 class YTDLSource(discord.PCMVolumeTransformer):
     """
@@ -75,26 +79,31 @@ class YTDLSource(discord.PCMVolumeTransformer):
                         current_options = custom_ffmpeg_options.get('options', '')
                         custom_ffmpeg_options['options'] = f"{current_options} -ss {timestamp}".strip()
                 
-                # Create FFmpeg audio source with better performance using Opus
-                # Fix parameter names for discord.py FFmpeg classes
-                # FFmpegOpusAudio.from_probe() expects 'before' parameter
-                # FFmpegPCMAudio() constructor expects 'before_options' parameter
+                # Create FFmpeg audio source using simplified approach
+                # Use only FFmpegPCMAudio to avoid parameter conflicts
+                # FFmpegPCMAudio uses 'before_options' and 'options' parameters
                 
                 try:
-                    # Try FFmpegOpusAudio first for better performance
-                    opus_params = custom_ffmpeg_options.copy()
-                    if 'before_options' in opus_params:
-                        opus_params['before'] = opus_params.pop('before_options')
-                    
-                    audio_source = await discord.FFmpegOpusAudio.from_probe(filename, **opus_params)
+                    # Use FFmpegPCMAudio directly - more stable and predictable
+                    print(f"Creating FFmpegPCMAudio with params: {custom_ffmpeg_options}")
+                    audio_source = discord.FFmpegPCMAudio(filename, **custom_ffmpeg_options)
+                    print(f"Successfully created FFmpegPCMAudio for: {data.get('title', 'Unknown')}")
                     return cls(audio_source, data=data)
-                except Exception as opus_error:
-                    # Fallback to FFmpegPCMAudio if Opus fails
-                    print(f"FFmpegOpusAudio failed, falling back to FFmpegPCMAudio: {opus_error}")
-                    
-                    # FFmpegPCMAudio uses 'before_options' parameter (keep original)
-                    pcm_params = custom_ffmpeg_options.copy()
-                    return cls(discord.FFmpegPCMAudio(filename, **pcm_params), data=data)
+                except TypeError as type_error:
+                    print(f"TypeError in FFmpegPCMAudio (parameter issue): {type_error}")
+                    print(f"Parameters passed: {custom_ffmpeg_options}")
+                    # Try with minimal parameters to isolate the issue
+                    try:
+                        print("Attempting with minimal parameters...")
+                        audio_source = discord.FFmpegPCMAudio(filename)
+                        return cls(audio_source, data=data)
+                    except Exception as minimal_error:
+                        print(f"Even minimal FFmpegPCMAudio failed: {minimal_error}")
+                        raise Exception(f"FFmpeg parameter error: {type_error}")
+                except Exception as ffmpeg_error:
+                    print(f"FFmpegPCMAudio failed with general error: {ffmpeg_error}")
+                    print(f"Error type: {type(ffmpeg_error)}")
+                    raise Exception(f"Failed to create audio source: {ffmpeg_error}")
                 
             except Exception as e:
                 if attempt == retries - 1:
