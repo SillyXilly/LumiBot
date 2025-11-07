@@ -77,18 +77,24 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 
                 # Create FFmpeg audio source with better performance using Opus
                 # Fix parameter names for discord.py FFmpeg classes
-                ffmpeg_params = custom_ffmpeg_options.copy()
-                if 'before_options' in ffmpeg_params:
-                    ffmpeg_params['before'] = ffmpeg_params.pop('before_options')
+                # FFmpegOpusAudio.from_probe() expects 'before' parameter
+                # FFmpegPCMAudio() constructor expects 'before_options' parameter
                 
                 try:
                     # Try FFmpegOpusAudio first for better performance
-                    audio_source = await discord.FFmpegOpusAudio.from_probe(filename, **ffmpeg_params)
+                    opus_params = custom_ffmpeg_options.copy()
+                    if 'before_options' in opus_params:
+                        opus_params['before'] = opus_params.pop('before_options')
+                    
+                    audio_source = await discord.FFmpegOpusAudio.from_probe(filename, **opus_params)
                     return cls(audio_source, data=data)
                 except Exception as opus_error:
                     # Fallback to FFmpegPCMAudio if Opus fails
                     print(f"FFmpegOpusAudio failed, falling back to FFmpegPCMAudio: {opus_error}")
-                    return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_params), data=data)
+                    
+                    # FFmpegPCMAudio uses 'before_options' parameter (keep original)
+                    pcm_params = custom_ffmpeg_options.copy()
+                    return cls(discord.FFmpegPCMAudio(filename, **pcm_params), data=data)
                 
             except Exception as e:
                 if attempt == retries - 1:
