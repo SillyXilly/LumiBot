@@ -63,22 +63,25 @@ chmod +x scripts/install_cron.sh
 ./scripts/install_cron.sh
 ```
 
-This sets up daily automatic cookie refresh at 6:00 AM.
+This sets up automatic cookie refresh every 30 minutes.
 
 ## How It Works
 
 ### 🔄 **Automated Process**
-1. **Headless Chrome** launches invisibly
-2. **Logs into Google/YouTube** using your credentials
-3. **Extracts fresh cookies** from the browser session
-4. **Saves cookies** in Netscape format for yt-dlp
-5. **Validates cookies** by testing with yt-dlp
-6. **Logs results** for monitoring
+1. **Scheduled Refresh**: Runs every 30 minutes automatically
+2. **On-Demand Refresh**: Triggers when YouTube authentication fails
+3. **Headless Chrome** launches invisibly
+4. **Logs into Google/YouTube** using your credentials
+5. **Extracts fresh cookies** from the browser session
+6. **Saves cookies** in Netscape format for yt-dlp
+7. **Validates cookies** by testing with yt-dlp
+8. **Self-Healing**: Bot automatically recovers from cookie failures
 
-### ⏰ **Daily Schedule**
-- **Time**: 6:00 AM daily
+### ⏰ **Automated Schedule**
+- **Frequency**: Every 30 minutes
+- **On-Demand**: Automatic refresh when authentication fails
 - **Log Location**: `~/apps/LumiBot/logs/cookie_refresh.log`
-- **Automatic**: No manual intervention needed
+- **Self-Healing**: No manual intervention needed
 
 ## Monitoring & Troubleshooting
 

@@ -111,10 +111,41 @@ class YTDLSource(discord.PCMVolumeTransformer):
                     error_msg = str(e)
                     if "Video unavailable" in error_msg or "Private video" in error_msg:
                         raise Exception(f"Cannot play this video - it may be private, age-restricted, or deleted: {error_msg}")
-                    elif "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-                        raise Exception("YouTube authentication required. The bot is configured to use browser cookies. Make sure you're logged into YouTube in Chrome, then restart the bot. See YOUTUBE_SETUP.md for details.")
-                    elif "cookies" in error_msg.lower():
-                        raise Exception("Cookie authentication failed. Please check that you're logged into YouTube in your browser. See YOUTUBE_SETUP.md for setup instructions.")
+                    elif "Sign in to confirm" in error_msg or "bot" in error_msg.lower() or "cookies" in error_msg.lower():
+                        # Try to refresh cookies automatically
+                        print("🔄 YouTube authentication failed - attempting automatic cookie refresh...")
+                        try:
+                            import subprocess
+                            import os
+                            from pathlib import Path
+                            
+                            # Get the bot directory (parent of src)
+                            bot_dir = Path(__file__).parent.parent.parent
+                            refresh_script = bot_dir / "scripts" / "refresh_cookies.py"
+                            
+                            if refresh_script.exists():
+                                print(f"📍 Running cookie refresh script: {refresh_script}")
+                                result = subprocess.run([
+                                    'python', str(refresh_script)
+                                ], capture_output=True, text=True, timeout=120, cwd=str(bot_dir))
+                                
+                                if result.returncode == 0:
+                                    print("✅ Cookies refreshed successfully!")
+                                    print("🔄 Please try the command again - cookies should now be fresh.")
+                                    raise Exception("YouTube authentication refreshed. Please try your command again - fresh cookies are now available.")
+                                else:
+                                    print(f"❌ Cookie refresh failed: {result.stderr}")
+                                    raise Exception(f"YouTube authentication failed and cookie refresh unsuccessful: {result.stderr}")
+                            else:
+                                print(f"❌ Cookie refresh script not found at: {refresh_script}")
+                                raise Exception("YouTube authentication failed. Cookie refresh script not found. Please check your setup.")
+                                
+                        except subprocess.TimeoutExpired:
+                            print("⏰ Cookie refresh timed out after 2 minutes")
+                            raise Exception("YouTube authentication failed. Cookie refresh timed out - please try again later.")
+                        except Exception as refresh_error:
+                            print(f"💥 Cookie refresh error: {refresh_error}")
+                            raise Exception(f"YouTube authentication failed. Cookie refresh error: {refresh_error}")
                     elif "FFmpeg" in error_msg or "ffmpeg" in error_msg:
                         raise Exception(f"Audio processing error - please check if FFmpeg is properly installed: {error_msg}")
                     else:

@@ -6,8 +6,8 @@ echo "⏰ Setting up automated cookie refresh cron job..."
 # Create logs directory if it doesn't exist
 mkdir -p ~/apps/LumiBot/logs
 
-# Create the cron job entry
-CRON_JOB="0 6 * * * cd /home/afleel/apps/LumiBot && python scripts/refresh_cookies.py >> logs/cookie_refresh.log 2>&1"
+# Create the cron job entry (every 30 minutes)
+CRON_JOB="*/30 * * * * cd /home/afleel/apps/LumiBot && python scripts/refresh_cookies.py >> logs/cookie_refresh.log 2>&1"
 
 # Check if cron job already exists
 if crontab -l 2>/dev/null | grep -q "refresh_cookies.py"; then
@@ -22,7 +22,7 @@ fi
 
 echo "✅ Cron job installed successfully!"
 echo ""
-echo "📅 Schedule: Daily at 6:00 AM"
+echo "📅 Schedule: Every 30 minutes"
 echo "📝 Logs: ~/apps/LumiBot/logs/cookie_refresh.log"
 echo ""
 echo "🔍 To view current cron jobs:"
