@@ -18,15 +18,20 @@ sudo apt update
 if ! command -v google-chrome &> /dev/null; then
     echo "🌐 Installing Google Chrome..."
     
-    # Add Google's signing key
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+    # Modern method for Ubuntu 24.04+ (using signed-by)
+    echo "📥 Downloading Chrome directly from Google..."
     
-    # Add Chrome repository
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+    # Download Chrome .deb package directly
+    wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
     
-    # Update package list and install Chrome
-    sudo apt update
-    sudo apt install -y google-chrome-stable
+    # Install Chrome package
+    sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb
+    
+    # Fix any dependency issues
+    sudo apt-get install -f -y
+    
+    # Clean up
+    rm /tmp/google-chrome-stable_current_amd64.deb
     
     echo "✅ Google Chrome installed successfully"
 else

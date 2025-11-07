@@ -59,19 +59,35 @@ class YouTubeCookieRefresher:
             print("✅ Chrome driver initialized successfully")
         except Exception as e:
             print(f"❌ Failed to initialize Chrome driver: {e}")
-            print("💡 Trying alternative ChromeDriver setup...")
+            print("💡 Trying alternative browser setups...")
             
-            # Fallback: try without service (if ChromeDriver is in PATH)
+            # Fallback 1: try without service (if ChromeDriver is in PATH)
             try:
                 self.driver = webdriver.Chrome(options=chrome_options)
                 self.driver.implicitly_wait(10)
                 print("✅ Chrome driver initialized successfully (fallback method)")
             except Exception as fallback_error:
-                print(f"❌ Fallback also failed: {fallback_error}")
-                print("🔧 Please ensure Chrome and ChromeDriver are properly installed:")
-                print("   1. Install Chrome: sudo apt install google-chrome-stable")
-                print("   2. Run setup script: ./scripts/setup_automation.sh")
-                raise
+                print(f"❌ Chrome fallback failed: {fallback_error}")
+                
+                # Fallback 2: try Chromium
+                try:
+                    print("🔄 Trying Chromium browser...")
+                    from webdriver_manager.chrome import ChromeDriverManager
+                    from selenium.webdriver.chrome.service import Service
+                    
+                    # Set Chromium binary location
+                    chrome_options.binary_location = "/usr/bin/chromium-browser"
+                    service = Service(ChromeDriverManager(chrome_type="chromium").install())
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                    self.driver.implicitly_wait(10)
+                    print("✅ Chromium driver initialized successfully")
+                except Exception as chromium_error:
+                    print(f"❌ Chromium also failed: {chromium_error}")
+                    print("🔧 Browser installation required. Try:")
+                    print("   1. Run: ./scripts/install_chrome_ubuntu24.sh")
+                    print("   2. Or install manually: sudo apt install chromium-browser")
+                    print("   3. Or check CHROME_TROUBLESHOOTING.md")
+                    raise
     
     def login_to_youtube(self):
         """Automated login to YouTube"""
