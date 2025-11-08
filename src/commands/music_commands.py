@@ -4,7 +4,6 @@ Music commands module for Discord bot.
 import asyncio
 import validators
 import discord
-import yt_dlp as youtube_dl
 from discord.ext import commands
 from typing import Optional
 
@@ -103,24 +102,11 @@ def setup_music_commands(bot: commands.Bot) -> None:
             
         async with ctx.typing():
             try:
-                # Create a copy of the ytdl options specifically for playlist handling
-                ytdl_options = YTDLSource.ytdl.params.copy()
-                ytdl_options.update({
-                    'format': 'bestaudio/best',
-                    'noplaylist': False,
-                    'extract_flat': 'in_playlist',
-                    'playlist_items': f'1-{PLAYLIST_LIMIT}'
-                })
+                # Use PyTubeFix to extract playlist information
+                playlist_dict = await YTDLSource.get_playlist(url, loop=bot.loop, limit=PLAYLIST_LIMIT)
                 
-                # Create a temporary ytdl instance with these options
-                temp_ytdl = youtube_dl.YoutubeDL(ytdl_options)
-                
-                def extract_playlist_info():
-                    return temp_ytdl.extract_info(url, download=False)
-                playlist_dict = await bot.loop.run_in_executor(None, extract_playlist_info)
-                
-                if 'entries' not in playlist_dict:
-                    await ctx.send('This URL does not appear to be a playlist.')
+                if not playlist_dict or 'entries' not in playlist_dict:
+                    await ctx.send('This URL does not appear to be a playlist or could not be accessed.')
                     return
                     
                 entries = playlist_dict['entries']

@@ -11,27 +11,6 @@ load_dotenv()
 COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '!')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
-# YouTube downloader configuration - optimized for better format selection
-YTDL_FORMAT_OPTIONS = {
-    'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0',
-    'extractaudio': True,
-    'audioformat': 'm4a',
-    'prefer_ffmpeg': True,
-    # Cookie configuration for YouTube authentication
-    #'cookiesfrombrowser': ('chrome',),  # Extract cookies from Chrome browser
-    # Alternative: use 
-    'cookiefile': 'cookies.txt'
-}
 
 # FFmpeg configuration - optimized for better streaming performance
 FFMPEG_OPTIONS = {

@@ -1,7 +1,0 @@
-# Discord Bot Configuration
-DISCORD_TOKEN=your_discord_bot_token_here
-COMMAND_PREFIX=!
-
-# YouTube Authentication (for automated cookie refresh)
-YOUTUBE_EMAIL=your_youtube_email@gmail.com
-YOUTUBE_PASSWORD=your_youtube_password

@@ -1,42 +1,38 @@
 """
-YouTube downloader module for the Discord music bot.
+YouTube downloader module for the Discord music bot using PyTubeFix.
 """
 import asyncio
 import discord
-import yt_dlp as youtube_dl
-from src.config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS
+from pytubefix import YouTube, Search, Playlist
+from pytubefix.exceptions import VideoUnavailable, RegexMatchError, PytubeFixError
+from src.config import FFMPEG_OPTIONS
 
-# Suppress bug reports from yt-dlp
-def suppress_bug_reports(*args, **kwargs):
-    """Suppress yt-dlp bug report messages - accepts any arguments"""
-    return ''
-
-youtube_dl.utils.bug_reports_message = suppress_bug_reports
 
 class YTDLSource(discord.PCMVolumeTransformer):
     """
-    Custom audio source class for YouTube downloads
+    Custom audio source class for YouTube downloads using PyTubeFix
     """
-    # Create YouTube downloader instance as class variable
-    ytdl = youtube_dl.YoutubeDL(YTDL_FORMAT_OPTIONS)
     
-    def __init__(self, source, *, data, volume=1.5):
+    def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
         self.data = data
-        self.title = data.get('title', 'Unknown title')
-        self.url = data.get('url', '')
+        self.title = data.get('title')
+        self.url = data.get('url')
+        self.duration = data.get('duration')
+        self.thumbnail = data.get('thumbnail')
+        self.uploader = data.get('uploader')
+        self.view_count = data.get('view_count')
         self.webpage_url = data.get('webpage_url', data.get('url', ''))
-        self.duration = data.get('duration', 0)
-
+        
     @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False, timestamp=0, retries=3):
+    async def from_url(cls, url, *, loop=None, stream=True, timestamp=0, retries=3):
         """
-        Create a YTDLSource from a URL with optional timestamp and retries.
+        Create a YTDLSource from a YouTube URL using PyTubeFix
         
         Args:
             url (str): The YouTube URL to play
             loop (asyncio.AbstractEventLoop, optional): Event loop to use
-            stream (bool, optional): Whether to stream or download. Defaults to False.
+            stream (bool, optional): Whether to stream or download. Defaults to True.
             timestamp (int, optional): Start time in seconds. Defaults to 0.
             retries (int, optional): Number of retries on failure. Defaults to 3.
             
@@ -47,55 +43,47 @@ class YTDLSource(discord.PCMVolumeTransformer):
         
         for attempt in range(retries):
             try:
-                # Extract info from YouTube with better error handling
-                def extract_data():
-                    try:
-                        return cls.ytdl.extract_info(url, download=not stream)
-                    except Exception as e:
-                        if "Sign in to confirm your age" in str(e) or "Private video" in str(e):
-                            raise Exception(f"Video unavailable: {e}")
-                        elif "Video unavailable" in str(e):
-                            raise Exception(f"Video not found or deleted: {e}")
-                        else:
-                            raise e
-                data = await loop.run_in_executor(None, extract_data)
+                # Extract video information using PyTubeFix
+                yt = await loop.run_in_executor(None, YouTube, url)
                 
-                if 'entries' in data:
-                    # Take first item from a playlist
-                    data = data['entries'][0]
-                    
-                # Get filename or direct URL
-                filename = data['url'] if stream else cls.ytdl.prepare_filename(data)
+                # Get the best audio stream
+                audio_stream = yt.streams.filter(only_audio=True).first()
+                if not audio_stream:
+                    raise Exception("No audio stream available for this video")
+                
+                # Get the stream URL
+                stream_url = audio_stream.url
+                
+                # Prepare data dictionary similar to yt-dlp format
+                data = {
+                    'title': yt.title,
+                    'url': stream_url,
+                    'duration': yt.length,
+                    'thumbnail': yt.thumbnail_url,
+                    'uploader': yt.author,
+                    'view_count': yt.views,
+                    'webpage_url': url
+                }
+                
+                # Use custom FFmpeg options from config
+                custom_ffmpeg_options = FFMPEG_OPTIONS.copy()
                 
                 # Apply timestamp if provided
-                custom_ffmpeg_options = FFMPEG_OPTIONS.copy()
                 if timestamp > 0:
-                    if stream:
-                        # For streaming, timestamp needs to be in before_options
-                        current_before = custom_ffmpeg_options.get('before_options', '')
-                        custom_ffmpeg_options['before_options'] = f"{current_before} -ss {timestamp}".strip()
-                    else:
-                        # For downloaded files, timestamp can be in options
-                        current_options = custom_ffmpeg_options.get('options', '')
-                        custom_ffmpeg_options['options'] = f"{current_options} -ss {timestamp}".strip()
-                
-                # Create FFmpeg audio source using simplified approach
-                # Use only FFmpegPCMAudio to avoid parameter conflicts
-                # FFmpegPCMAudio uses 'before_options' and 'options' parameters
+                    current_before = custom_ffmpeg_options.get('before_options', '')
+                    custom_ffmpeg_options['before_options'] = f"{current_before} -ss {timestamp}".strip()
                 
                 try:
-                    # Use FFmpegPCMAudio directly - more stable and predictable
-                    print(f"Creating FFmpegPCMAudio with params: {custom_ffmpeg_options}")
-                    audio_source = discord.FFmpegPCMAudio(filename, **custom_ffmpeg_options)
+                    print(f"Creating FFmpegPCMAudio for: {data.get('title', 'Unknown')}")
+                    audio_source = discord.FFmpegPCMAudio(stream_url, **custom_ffmpeg_options)
                     print(f"Successfully created FFmpegPCMAudio for: {data.get('title', 'Unknown')}")
                     return cls(audio_source, data=data)
                 except TypeError as type_error:
                     print(f"TypeError in FFmpegPCMAudio (parameter issue): {type_error}")
                     print(f"Parameters passed: {custom_ffmpeg_options}")
-                    # Try with minimal parameters to isolate the issue
                     try:
                         print("Attempting with minimal parameters...")
-                        audio_source = discord.FFmpegPCMAudio(filename)
+                        audio_source = discord.FFmpegPCMAudio(stream_url)
                         return cls(audio_source, data=data)
                     except Exception as minimal_error:
                         print(f"Even minimal FFmpegPCMAudio failed: {minimal_error}")
@@ -104,59 +92,33 @@ class YTDLSource(discord.PCMVolumeTransformer):
                     print(f"FFmpegPCMAudio failed with general error: {ffmpeg_error}")
                     print(f"Error type: {type(ffmpeg_error)}")
                     raise Exception(f"Failed to create audio source: {ffmpeg_error}")
-                
+                    
+            except VideoUnavailable as e:
+                raise Exception(f"Video is unavailable: {str(e)}")
+            except RegexMatchError as e:
+                raise Exception(f"Invalid YouTube URL: {str(e)}")
+            except PytubeFixError as e:
+                print(f"PyTubeFix error on attempt {attempt + 1}: {e}")
+                if attempt == retries - 1:
+                    raise Exception(f"Failed to load video after {retries} attempts: {str(e)}")
             except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
                 if attempt == retries - 1:
                     # Provide more helpful error messages
                     error_msg = str(e)
-                    if "Video unavailable" in error_msg or "Private video" in error_msg:
-                        raise Exception(f"Cannot play this video - it may be private, age-restricted, or deleted: {error_msg}")
-                    elif "Sign in to confirm" in error_msg or "bot" in error_msg.lower() or "cookies" in error_msg.lower():
-                        # Try to refresh cookies automatically
-                        print("🔄 YouTube authentication failed - attempting automatic cookie refresh...")
-                        try:
-                            import subprocess
-                            import os
-                            from pathlib import Path
-                            
-                            # Get the bot directory (parent of src)
-                            bot_dir = Path(__file__).parent.parent.parent
-                            refresh_script = bot_dir / "scripts" / "refresh_cookies.py"
-                            
-                            if refresh_script.exists():
-                                print(f"📍 Running cookie refresh script: {refresh_script}")
-                                result = subprocess.run([
-                                    'python', str(refresh_script)
-                                ], capture_output=True, text=True, timeout=120, cwd=str(bot_dir))
-                                
-                                if result.returncode == 0:
-                                    print("✅ Cookies refreshed successfully!")
-                                    print("🔄 Please try the command again - cookies should now be fresh.")
-                                    raise Exception("YouTube authentication refreshed. Please try your command again - fresh cookies are now available.")
-                                else:
-                                    print(f"❌ Cookie refresh failed: {result.stderr}")
-                                    raise Exception(f"YouTube authentication failed and cookie refresh unsuccessful: {result.stderr}")
-                            else:
-                                print(f"❌ Cookie refresh script not found at: {refresh_script}")
-                                raise Exception("YouTube authentication failed. Cookie refresh script not found. Please check your setup.")
-                                
-                        except subprocess.TimeoutExpired:
-                            print("⏰ Cookie refresh timed out after 2 minutes")
-                            raise Exception("YouTube authentication failed. Cookie refresh timed out - please try again later.")
-                        except Exception as refresh_error:
-                            print(f"💥 Cookie refresh error: {refresh_error}")
-                            raise Exception(f"YouTube authentication failed. Cookie refresh error: {refresh_error}")
+                    if "age-restricted" in error_msg.lower() or "sign in" in error_msg.lower():
+                        raise Exception("This video is age-restricted or requires authentication")
                     elif "FFmpeg" in error_msg or "ffmpeg" in error_msg:
                         raise Exception(f"Audio processing error - please check if FFmpeg is properly installed: {error_msg}")
                     else:
                         raise Exception(f"Failed to load audio after {retries} attempts: {error_msg}")
                 # Exponential backoff for retries
                 await asyncio.sleep(2 ** attempt)
-
+    
     @classmethod
     async def search_source(cls, search_query, *, loop=None, max_results=5):
         """
-        Search for YouTube videos based on a query.
+        Search for YouTube videos and return results using PyTubeFix
         
         Args:
             search_query (str): The search query
@@ -168,30 +130,87 @@ class YTDLSource(discord.PCMVolumeTransformer):
         """
         loop = loop or asyncio.get_event_loop()
         
-        # Format query for YouTube search
-        search_query = f"ytsearch{max_results}:{search_query}"
-        
         try:
-            def extract_search_data():
-                return cls.ytdl.extract_info(search_query, download=False)
-            info = await loop.run_in_executor(None, extract_search_data)
+            # Search for videos using PyTubeFix
+            search = await loop.run_in_executor(None, Search, search_query)
+            results = []
+            result_message = ""
             
-            if info and 'entries' in info and info['entries']:
-                entries = info['entries']
-                result_message = ""
-                
-                for i, entry in enumerate(entries):
-                    if entry:  # Check if the entry is not None
-                        duration_str = cls._format_duration(entry.get('duration', 0))
-                        result_message += f"{i+1}: {entry.get('title', 'Unknown Title')} ({duration_str})\n"
-                
-                return entries, result_message
-            else:
-                return [], "No search results found."
+            # Get up to max_results results
+            for i, video in enumerate(search.results[:max_results]):
+                try:
+                    result_data = {
+                        'title': video.title,
+                        'url': video.watch_url,
+                        'duration': video.length,
+                        'thumbnail': video.thumbnail_url,
+                        'uploader': video.author,
+                        'view_count': video.views,
+                        'webpage_url': video.watch_url
+                    }
+                    results.append(result_data)
+                    
+                    # Format duration for display
+                    duration_str = cls._format_duration(video.length)
+                    result_message += f"{i+1}: {video.title} ({duration_str})\n"
+                    
+                except Exception as e:
+                    print(f"Error processing search result {i}: {e}")
+                    continue
+            
+            return results, result_message if results else "No search results found."
                 
         except Exception as e:
+            print(f"Search failed: {e}")
             return [], f"An error occurred: {str(e)}"
-
+    
+    @classmethod
+    async def get_playlist(cls, url, *, loop=None, limit=30):
+        """
+        Extract playlist information from YouTube using PyTubeFix
+        
+        Args:
+            url (str): The YouTube playlist URL
+            loop (asyncio.AbstractEventLoop, optional): Event loop to use
+            limit (int, optional): Maximum number of videos to extract. Defaults to 30.
+            
+        Returns:
+            dict: Playlist information with entries, or None if failed
+        """
+        loop = loop or asyncio.get_event_loop()
+        
+        try:
+            # Extract playlist information using PyTubeFix
+            playlist = await loop.run_in_executor(None, Playlist, url)
+            
+            entries = []
+            for i, video in enumerate(playlist.videos[:limit]):
+                try:
+                    entry_data = {
+                        'title': video.title,
+                        'url': video.watch_url,
+                        'duration': video.length,
+                        'thumbnail': video.thumbnail_url,
+                        'uploader': video.author,
+                        'view_count': video.views,
+                        'webpage_url': video.watch_url
+                    }
+                    entries.append(entry_data)
+                except Exception as e:
+                    print(f"Error processing playlist video {i}: {e}")
+                    continue
+            
+            return {
+                'title': playlist.title or 'Unknown Playlist',
+                'entries': entries,
+                'uploader': playlist.owner or 'Unknown',
+                'entry_count': len(entries)
+            }
+                
+        except Exception as e:
+            print(f"Playlist extraction failed: {e}")
+            return None
+    
     @staticmethod
     def _format_duration(duration_seconds):
         """Format duration in seconds to MM:SS format"""
@@ -199,4 +218,4 @@ class YTDLSource(discord.PCMVolumeTransformer):
             return "Unknown"
             
         minutes, seconds = divmod(int(duration_seconds), 60)
-        return f"{minutes}:{seconds:02d}" 
+        return f"{minutes}:{seconds:02d}"

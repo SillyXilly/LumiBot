@@ -58,7 +58,7 @@ python main.py
 - Python 3.8 or higher
 - FFmpeg installed on your system
 - Discord.py
-- yt-dlp
+- pytubefix
 - python-dotenv
 
 ## Contributing
